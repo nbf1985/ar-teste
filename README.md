@@ -1,8 +1,20 @@
-# ar-teste
+# ar-teste — Surpresa de Natal em realidade aumentada
 
-Teste de realidade aumentada no navegador (WebAR): escaneie o QR code, toque em **Iniciar** e aponte a câmera para `alvo.png`.
+Aponte o celular para o porta-copos: abre um buraco preto, o Papai Noel joga o saco de presentes para fora,
+dispara um arpão, é puxado pelo cabo, solta, dá um mortal e aparece **FELIZ NATAL**.
 
 - Página: https://nbf1985.github.io/ar-teste/
-- Imagem-alvo: https://nbf1985.github.io/ar-teste/alvo.png
-- Tecnologia: [MindAR](https://github.com/hiukim/mind-ar-js) 1.2.5 + [Three.js](https://threejs.org) 0.160.0 (open source)
-- Modelo 3D de teste: “raccoon” por hiukim (Sketchfab), licença CC BY 4.0
+- Porta-copos (para abrir na tela): https://nbf1985.github.io/ar-teste/porta-copos.png
+- Porta-copos para imprimir (A4, 10 cm): https://nbf1985.github.io/ar-teste/porta-copos-imprimir-A4.pdf
+
+## Arquivos
+- `index.html` — liga a câmera, reconhece o porta-copos e chama a cena
+- `natal.js` — a cena inteira (buraco, Papai Noel, saco, arpão, texto, neve) e o roteiro de tempos (`T`)
+- `assets/porta-copos.mind` — o porta-copos "compilado" para o reconhecimento de imagem
+- `porta-copos.png` — arte do porta-copos (provisória)
+
+## Ajuste de tremor
+Dá para testar valores pelo link, sem mexer no código: `?cf=0.0005&beta=0.01` (padrão).
+`cf` menor = mais estável e um pouco mais lento; `beta` maior = acompanha mais rápido quando o celular mexe.
+
+Tecnologia open source: [MindAR](https://github.com/hiukim/mind-ar-js) 1.2.5 + [Three.js](https://threejs.org) 0.160.0.
