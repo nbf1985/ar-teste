@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Teste AR – Etapa 1</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: system-ui, -apple-system, sans-serif; }
+    #container { position: absolute; inset: 0; z-index: 0; } /* z-index 0 mantém o vídeo da câmera visível */
+    #overlay {
+      position: absolute; inset: 0; z-index: 10;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+      padding: 24px; background: #111; color: #fff; text-align: center;
+    }
+    #overlay h1 { font-size: 22px; margin: 0; }
+    #overlay p { margin: 0; opacity: .8; max-width: 320px; line-height: 1.4; }
+    #startBtn { margin-top: 12px; font-size: 18px; padding: 14px 32px; border: 0; border-radius: 999px; background: #fff; color: #111; }
+    #startBtn:disabled { opacity: .5; }
+    #status { position: absolute; left: 0; right: 0; bottom: 24px; z-index: 5; text-align: center; color: #fff; font-size: 15px; text-shadow: 0 1px 3px #000; pointer-events: none; }
+  </style>
+
+  <!-- Bibliotecas (todas open source): Three.js 0.160 (MindAR 1.2.5 não funciona com Three.js 0.162+) e MindAR 1.2.5 -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="container"></div>
+
+  <div id="overlay">
+    <h1>Teste de Realidade Aumentada</h1>
+    <p>Toque em Iniciar, permita a câmera e aponte para a imagem do guaxinim.</p>
+    <button id="startBtn" disabled>Carregando…</button>
+    <small style="opacity:.5;margin-top:24px">Modelo 3D de teste: “raccoon” por hiukim (Sketchfab), licença CC BY 4.0</small>
+  </div>
+
+  <div id="status"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { MindARThree } from 'mindar-image-three';
+
+    // Imagem-alvo e modelo 3D de exemplo do próprio MindAR (trocaremos pelos seus na etapa 2)
+    const ASSETS = './assets/';
+    const TARGET_FILE = ASSETS + 'raccoon.mind';   // arquivo "compilado" da imagem-alvo (alvo.png)
+    const MODEL_FILE  = ASSETS + 'raccoon/scene.gltf';
+
+    const statusEl = document.getElementById('status');
+    const overlay  = document.getElementById('overlay');
+    const startBtn = document.getElementById('startBtn');
+    window.arState = { started: false, targetFound: false, error: null }; // usado nos testes
+
+    // 1) Prepara o AR: o MindAR cria a câmera, a cena 3D e o vídeo da câmera dentro do #container
+    const mindarThree = new MindARThree({
+      container: document.getElementById('container'),
+      imageTargetSrc: TARGET_FILE,
+      uiScanning: 'no',          // usamos nossa própria mensagem de status
+    });
+    const { renderer, scene, camera } = mindarThree;
+
+    // Luz para o modelo não ficar preto
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 3));
+    const sun = new THREE.DirectionalLight(0xffffff, 2);
+    sun.position.set(0, 1, 1);
+    scene.add(sun);
+
+    // 2) "Âncora": tudo que for colocado em anchor.group fica preso na imagem-alvo nº 0
+    const anchor = mindarThree.addAnchor(0);
+    anchor.onTargetFound = () => { statusEl.textContent = ''; window.arState.targetFound = true; };
+    anchor.onTargetLost  = () => { statusEl.textContent = 'Aponte a câmera para a imagem'; };
+
+    // 3) Carrega o modelo 3D animado (formato glTF)
+    let mixer = null;
+    const modelReady = new GLTFLoader().loadAsync(MODEL_FILE).then((gltf) => {
+      const model = gltf.scene;
+      model.scale.setScalar(0.05);        // tamanho em relação à imagem (largura da imagem = 1)
+      model.rotation.x = Math.PI / 2;     // "levanta" o modelo para ficar em pé sobre a imagem
+      anchor.group.add(model);
+      if (gltf.animations.length) {
+        mixer = new THREE.AnimationMixer(model);
+        mixer.clipAction(gltf.animations[0]).play();
+      }
+    });
+
+    modelReady
+      .then(() => { startBtn.disabled = false; startBtn.textContent = 'Iniciar'; })
+      .catch((e) => fail('Não consegui carregar o modelo 3D.', e));
+
+    // 4) Ao tocar em Iniciar: liga a câmera e começa o loop de desenho
+    startBtn.addEventListener('click', async () => {
+      startBtn.disabled = true;
+      startBtn.textContent = 'Abrindo câmera…';
+      try {
+        await mindarThree.start();
+        overlay.style.display = 'none';
+        statusEl.textContent = 'Aponte a câmera para a imagem';
+        window.arState.started = true;
+        const clock = new THREE.Clock();
+        renderer.setAnimationLoop(() => {
+          if (mixer) mixer.update(clock.getDelta());
+          renderer.render(scene, camera);
+        });
+      } catch (e) {
+        fail('Não consegui abrir a câmera. Confira se deu permissão e se a página está em HTTPS.', e);
+      }
+    });
+
+    function fail(msg, e) {
+      console.error(e);
+      window.arState.error = String(e && e.message || e);
+      overlay.style.display = 'flex';
+      overlay.querySelector('p').textContent = msg;
+      startBtn.style.display = 'none';
+    }
+  </script>
+</body>
+</html>
